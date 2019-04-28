@@ -1,7 +1,5 @@
 *~
 *.po
-*.lo
-*.la
 autom4te.cache
 *.in
 */.deps/*
@@ -26,5 +24,10 @@ py-compile
 stamp-h1
 */.DS_Store
 */.libs
+*/*.o
+*/*.a
+*/*.la
+*/*.lo
 */idevicerestore
+*/idevicerestore.exe
 .DS_Store
