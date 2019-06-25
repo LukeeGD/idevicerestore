@@ -1,7 +1,6 @@
-About
-=====
+# idevicerestore
 
-The idevicerestore tool allows to restore firmware files to iOS devices.
+This tool allows to restore firmware files to iOS devices.
 
 It is a full reimplementation of all granular steps which are performed during restore of a firmware to a device. 
 
@@ -10,20 +9,18 @@ In general, upgrades and downgrades are possible, however subject to availabilit
 To restore a device to some firmware, simply run the following:
 $ idevicerestore -w
 
-Requirements
-============
-
-Development Packages of:
-        libcurl
+## Requirements
+### Development Packages of:
+      libcurl
 	libimobiledevice
 	libirecovery
 	libusbmuxd
 	libplist
 	libzip
-        zlib
+      zlib
 	openssl
 
-Software:
+### Software:
 	make
 	autoheader
 	automake
@@ -32,23 +29,18 @@ Software:
 	pkg-config
 	gcc
 
-Installation
-============
-
+## Installation
 To compile run:
+
 	./autogen.sh && make && sudo make install
 
-Who/What/Where?
-===============
+## Who/What/Where?
 
 Home:
 	http://www.libimobiledevice.org/
 
 Original code:
 	git clone http://git.libimobiledevice.org/idevicerestore.git
-
-Original code (mirror):
-	git clone https://github.com/libimobiledevice/idevicerestore.git
 
 This fork code:
         git clone https://github.com/s0uthwest/idevicerestore.git
@@ -62,11 +54,11 @@ Mailing List:
 IRC:
 	irc://irc.freenode.net#libimobiledevice
 
-Credits
-=======
+## Credits
 
-Apple, iPhone, iPod, and iPod Touch are trademarks of Apple Inc.
+Apple, iPhone, iPod, and iPod touch are trademarks of Apple Inc.
 idevicerestore is an independent software tool and has not been authorized, sponsored, or otherwise approved by Apple Inc.
 
 README Updated on:
-	2019-01-28
+
+	2019-06-25
