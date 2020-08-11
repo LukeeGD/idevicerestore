@@ -19,9 +19,9 @@ AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
 
 # Checks for libraries.
-PKG_CHECK_MODULES(libirecovery, libirecovery >= 0.2.0)
+PKG_CHECK_MODULES(libirecovery, libirecovery-1.0 >= 0.2.0)
 PKG_CHECK_MODULES(libimobiledevice, libimobiledevice-1.0 >= 1.2.1)
-PKG_CHECK_MODULES(libplist, libplist >= 1.0)
+PKG_CHECK_MODULES(libplist, libplist-2.0 >= 1.0)
 PKG_CHECK_MODULES(libzip, libzip >= 1.4)
 PKG_CHECK_MODULES(libusbmuxd, libusbmuxd >= 1.0)
 PKG_CHECK_MODULES(libcurl, libcurl >= 7.0)
