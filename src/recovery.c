@@ -2,8 +2,8 @@
  * recovery.c
  * Functions for handling idevices in recovery mode
  *
- * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010-2012 Martin Szulecki. All Rights Reserved.
+ * Copyright (c) 2012 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -37,7 +37,7 @@
 
 int recovery_progress_callback(irecv_client_t client, const irecv_event_t* event) {
 	if (event->type == IRECV_PROGRESS) {
-		//print_progress_bar(event->progress);
+		print_progress_bar(event->progress);
 	}
 	return 0;
 }
@@ -103,11 +103,6 @@ int recovery_check_mode(struct idevicerestore_client_t* client) {
 	irecv_error_t recovery_error = IRECV_E_SUCCESS;
 	int mode = 0;
 
-	if (client->udid && client->ecid == 0) {
-		/* if we have a UDID but no ECID we can't make sure this is the correct device */
-		return -1;
-	}
-
 	irecv_init();
 	recovery_error=irecv_open_with_ecid(&recovery, client->ecid);
 
@@ -147,7 +142,7 @@ int recovery_set_autoboot(struct idevicerestore_client_t* client, int enable) {
 }
 
 int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build_identity) {
-    if (client->build_major >= 8) {
+	if (client->build_major >= 8) {
 		client->restore_boot_args = strdup("rd=md0 nand-enable-reformat=1 -progress");
 	}
 
@@ -168,9 +163,6 @@ int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build
 			}
 		}
 	}
-
-    //no need to set auto-boot false when we want to just boot the device
-	if ((client->flags & FLAG_BOOT) == 0) if (recovery_set_autoboot(client, 0) < 0) return -1;
 
 	info("Recovery Mode Environment:\n");
 	char* value = NULL;
@@ -201,15 +193,13 @@ int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build
 		}
 	}
 
-	/* send logo and show it */
-	if (recovery_send_applelogo(client, build_identity) < 0) {
-		error("ERROR: Unable to send AppleLogo\n");
+	if (recovery_set_autoboot(client, 0) < 0) {
 		return -1;
 	}
 
-	/* send components loaded by iBoot */
-	if (recovery_send_loaded_by_iboot(client, build_identity) < 0) {
-		error("ERROR: Unable to send components supposed to be loaded by iBoot\n");
+	/* send logo and show it */
+	if (recovery_send_applelogo(client, build_identity) < 0) {
+		error("ERROR: Unable to send AppleLogo\n");
 		return -1;
 	}
 
@@ -224,13 +214,13 @@ int recovery_enter_restore(struct idevicerestore_client_t* client, plist_t build
 		error("ERROR: Unable to send DeviceTree\n");
 		return -1;
 	}
-    
+
 	if (recovery_send_kernelcache(client, build_identity) < 0) {
 		error("ERROR: Unable to send KernelCache\n");
 		return -1;
 	}
 
-	if ((client->flags & FLAG_BOOT) == 0 && (client->flags & FLAG_NOBOOTX) == 0) client->mode = &idevicerestore_modes[MODE_RESTORE];
+	client->mode = &idevicerestore_modes[MODE_RESTORE];
 	return 0;
 }
 
@@ -270,39 +260,35 @@ int recovery_send_component(struct idevicerestore_client_t* client, plist_t buil
 	unsigned char* data = NULL;
 	char* path = NULL;
 	irecv_error_t err = 0;
- 
-    if (!client->recovery_custom_component_function) {
-        if (client->tss) {
-            if (tss_response_get_path_by_entry(client->tss, component, &path) < 0) {
-                debug("NOTE: No path for component %s in TSS, will fetch from build_identity\n", component);
-            }
-        }
-        if (!path) {
-            if (build_identity_get_component_path(build_identity, component, &path) < 0) {
-                error("ERROR: Unable to get path for component '%s'\n", component);
-                free(path);
-                return -1;
-            }
-        }
-        
-        unsigned char* component_data = NULL;
-        unsigned int component_size = 0;
-        int ret = extract_component(client->ipsw, path, &component_data, &component_size);
-        free(path);
-        if (ret < 0) {
-            error("ERROR: Unable to extract component: %s\n", component);
-            return -1;
-        }
-        
-        ret = personalize_component(component, component_data, component_size, client->tss, &data, &size);
-        free(component_data);
-        if (ret < 0) {
-            error("ERROR: Unable to get personalized component: %s\n", component);
-            return -1;
-        }
-    }else{
-        client->recovery_custom_component_function(client,build_identity,component, &data, &size);
-    }
+
+	if (client->tss) {
+		if (tss_response_get_path_by_entry(client->tss, component, &path) < 0) {
+			debug("NOTE: No path for component %s in TSS, will fetch from build_identity\n", component);
+		}
+	}
+	if (!path) {
+		if (build_identity_get_component_path(build_identity, component, &path) < 0) {
+			error("ERROR: Unable to get path for component '%s'\n", component);
+			free(path);
+			return -1;
+		}
+	}
+
+	unsigned char* component_data = NULL;
+	unsigned int component_size = 0;
+	int ret = extract_component(client->ipsw, path, &component_data, &component_size);
+	free(path);
+	if (ret < 0) {
+		error("ERROR: Unable to extract component: %s\n", component);
+		return -1;
+	}
+
+	ret = personalize_component(component, component_data, component_size, client->tss, &data, &size);
+	free(component_data);
+	if (ret < 0) {
+		error("ERROR: Unable to get personalized component: %s\n", component);
+		return -1;
+	}
 
 	info("Sending %s (%d bytes)...\n", component, size);
 
@@ -363,13 +349,18 @@ int recovery_send_applelogo(struct idevicerestore_client_t* client, plist_t buil
 		error("ERROR: Unable to set %s\n", component);
 		return -1;
 	}
-
-	recovery_error = irecv_send_command(client->recovery->client, "bgcolor 0 0 0");
+	
+	recovery_error = irecv_send_command(client->recovery->client, "bgcolor 0 0 0");	
 	if (recovery_error != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to display %s\n", component);
 		return -1;
 	}
-
+    
+	if (client->flags & FLAG_RERESTORE) {
+		info("[WARNING] If your device is not showing an Apple logo, then your APTicket may be incompatible.\n");
+		sleep(2);
+	}
+	
 	return 0;
 }
 
@@ -395,52 +386,6 @@ int recovery_send_devicetree(struct idevicerestore_client_t* client, plist_t bui
 	}
 
 	return 0;
-}
-
-int recovery_send_loaded_by_iboot(struct idevicerestore_client_t* client, plist_t build_identity) {
-	if (client->recovery == NULL) {
-		if (recovery_client_new(client) < 0) {
-			return -1;
-		}
-	}
-
-	plist_t manifest_node = plist_dict_get_item(build_identity, "Manifest");
-	if (!manifest_node || plist_get_node_type(manifest_node) != PLIST_DICT) {
-		error("ERROR: Unable to find manifest node\n");
-		return -1;
-	}
-
-	plist_dict_iter iter = NULL;
-	plist_dict_new_iter(manifest_node, &iter);
-	int err = 0;
-	while (iter) {
-		char *key = NULL;
-		plist_t node = NULL;
-		plist_dict_next_item(manifest_node, iter, &key, &node);
-		if (key == NULL)
-			break;
-		plist_t iboot_node = plist_access_path(node, 2, "Info", "IsLoadedByiBoot");
-		if (iboot_node && plist_get_node_type(iboot_node) == PLIST_BOOLEAN) {
-			uint8_t b = 0;
-			plist_get_bool_val(iboot_node, &b);
-			if (b) {
-				debug("DEBUG: %s is loaded by iBoot.\n", key);
-				if (recovery_send_component(client, build_identity, key) < 0) {
-					error("ERROR: Unable to send component '%s' to device.\n", key);
-					err++;
-				} else {
-					if (irecv_send_command(client->recovery->client, "firmware") != IRECV_E_SUCCESS) {
-						error("ERROR: iBoot command 'firmware' failed for component '%s'\n", key);
-						err++;
-					}
-				}
-			}
-		}
-		free(key);
-	}
-	free(iter);
-
-	return (err) ? -1 : 0;
 }
 
 int recovery_send_ramdisk(struct idevicerestore_client_t* client, plist_t build_identity) {
@@ -501,10 +446,8 @@ int recovery_send_kernelcache(struct idevicerestore_client_t* client, plist_t bu
 		recovery_error = irecv_send_command(client->recovery->client, setba);
 	}
 
-    if ((client->flags & FLAG_NOBOOTX) == 0) recovery_error = irecv_send_command(client->recovery->client, "bootx");
-    else info("Flag nobootx detected! Not executing \"bootx\", but device is ready\n");
-    
-    if (recovery_error != IRECV_E_SUCCESS) {
+	recovery_error = irecv_send_command(client->recovery->client, "bootx");
+	if (recovery_error != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to execute %s\n", component);
 		return -1;
 	}

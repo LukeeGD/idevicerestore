@@ -423,13 +423,13 @@ int img3_stitch_component(const char* component_name, const unsigned char* compo
 	}
 
 	int i;
-	for (i = 0; i < img3->num_elements; i++) {
+	for (i = 0; i <img3->num_elements; i++) {
 		if (img3->elements[i]->type == kEcidElement) {
-			info("Seems that %s is already personalized, leaving it alone...\n", component_name);
+			info("Seems that %s is already personalized, ignoring...\n", component_name);
 			img3_free(img3);
 			outbuf = malloc(component_size);
 			if (!outbuf) {
-				error("ERROR: Unable to allocate memory for IMG3 data\n");
+				error("ERROR: Unabled to allocate memory for IMG3 data\n");
 				return -1;
 			}
 			memcpy(outbuf, component_data, component_size);
@@ -438,7 +438,7 @@ int img3_stitch_component(const char* component_name, const unsigned char* compo
 			return 0;
 		}
 	}
-
+	
 	if (((img3_element_header*)blob)->full_size != blob_size) {
 		error("ERROR: Invalid blob passed for %s IMG3: The size %d embedded in the blob does not match the passed size of %d\n", component_name, ((img3_element_header*)blob)->full_size, blob_size, component_name);
 		img3_free(img3);

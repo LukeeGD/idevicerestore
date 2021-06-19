@@ -2,8 +2,8 @@
  * dfu.c
  * Functions for handling idevices in DFU mode
  *
- * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010-2013 Martin Szulecki. All Rights Reserved.
+ * Copyright (c) 2012-2015 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -90,11 +90,6 @@ int dfu_check_mode(struct idevicerestore_client_t* client, int* mode) {
 	irecv_client_t dfu = NULL;
 	int probe_mode = -1;
 
-	if (client->udid && client->ecid == 0) {
-		/* if we have a UDID but no ECID we can't make sure this is the correct device */
-		return -1;
-	}
-
 	irecv_init();
 	if (irecv_open_with_ecid(&dfu, client->ecid) != IRECV_E_SUCCESS) {
 		return -1;
@@ -114,7 +109,7 @@ int dfu_check_mode(struct idevicerestore_client_t* client, int* mode) {
 	return 0;
 }
 
-irecv_device_t dfu_get_irecv_device(struct idevicerestore_client_t* client) {
+const char* dfu_check_hardware_model(struct idevicerestore_client_t* client) {
 	irecv_client_t dfu = NULL;
 	irecv_error_t dfu_error = IRECV_E_SUCCESS;
 	irecv_device_t device = NULL;
@@ -130,7 +125,7 @@ irecv_device_t dfu_get_irecv_device(struct idevicerestore_client_t* client) {
 		return NULL;
 	}
 
-	return device;
+	return device->hardware_model;
 }
 
 int dfu_send_buffer(struct idevicerestore_client_t* client, unsigned char* buffer, unsigned int size)
@@ -178,15 +173,27 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 	unsigned char* data = NULL;
 	uint32_t size = 0;
 
-	if (personalize_component(component, component_data, component_size, client->tss, &data, &size) < 0) {
-		error("ERROR: Unable to get personalized component: %s\n", component);
-		free(component_data);
-		return -1;
+    if (!client->isCustom) {
+        if (personalize_component(component, component_data, component_size, client->tss, &data, &size) < 0) {
+            error("ERROR: Unable to get personalized component: %s\n", component);
+            free(component_data);
+            return -1;
+        }
+        free(component_data);
+        component_data = NULL;
+    }
+    else {
+        data = component_data;
+        size = component_size;
+    }
+    
+	/* Using cached blobs is only available with 32-bit devices. */
+	if (client->image4supported & FLAG_RERESTORE) {
+		error("ERROR: Re-Restoring is only supported on 32-bit devices.\n");
+		exit(-1);
 	}
-	free(component_data);
-	component_data = NULL;
 
-	if (!client->image4supported && (client->build_major > 8) && !(client->flags & (FLAG_CUSTOM | FLAG_DOWNGRADE)) && (strcmp(component, "iBEC") == 0)) {
+	if (!client->image4supported && client->build_major > 8 && !(client->flags & FLAG_CUSTOM) && !strcmp(component, "iBEC") && !client->isCustom) {
 		unsigned char* ticket = NULL;
 		unsigned int tsize = 0;
 		if (tss_response_get_ap_ticket(client->tss, &ticket, &tsize) < 0) {
@@ -205,6 +212,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 		free(data);
 		data = newdata;
 		size += fillsize;
+        
 	}
 
 	info("Sending %s (%d bytes)...\n", component, size);
@@ -403,8 +411,33 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 	}
 
 	dfu_client_free(client);
-
-	sleep(7);
+    
+    /* Wait 2s after attempting to boot the image */
+    sleep(2);
+    
+    mode = 0;
+    
+    /* Try checking for the device's mode for about 10 seconds until it's in recovery again */
+    for (int i=0; i < 20; i++) {
+        
+        /* Get the current mode */
+        mode = check_mode(client);
+        
+        /* If mode came back NULL, wait 0.5s and try again */
+        if (!mode) {
+            usleep(500000);
+            continue;
+        }
+        
+        /* If the current mode is not recovery, wait 0.5s and try again */
+        if (mode != MODE_RECOVERY) {
+            usleep(500000);
+            continue;
+        }
+        
+        /* Hello recovery */
+        break;
+    }
 
 	// Reconnect to device, but this time make sure we're not still in DFU mode
 	if (recovery_client_new(client) < 0) {

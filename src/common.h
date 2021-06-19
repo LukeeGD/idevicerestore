@@ -2,8 +2,8 @@
  * common.h
  * Misc functions used in idevicerestore
  *
- * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2012 Martin Szulecki. All Rights Reserved.
+ * Copyright (c) 2012 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -53,8 +53,6 @@ extern "C" {
 #define IBOOT_FLAG_EFFECTIVE_SECURITY_MODE 1 << 3
 #define IBOOT_FLAG_EFFECTIVE_PRODUCTION_MODE 1 << 4
 
-#define USER_AGENT_STRING "InetURL/1.0"
-
 struct dfu_client_t;
 struct normal_client_t;
 struct restore_client_t;
@@ -76,23 +74,18 @@ struct idevicerestore_entry_t {
 };
 
 struct idevicerestore_client_t {
-    int flags;
-    char *otamanifest;
-    char *bbfwtmp;
-    char *sepfwdata;
-    size_t sepfwdatasize;
-    plist_t tss;
-    plist_t septss;
-    plist_t basebandBuildIdentity;
-    char* tss_url;
-    plist_t version_data;
-    uint64_t ecid;
-    unsigned char* nonce;
-    int nonce_size;
-    unsigned char* sepnonce;
-    int sepnonce_size;
-    int image4supported;
-    plist_t preflight_info;
+	char* bbfwtmp;
+	int flags;
+	char* otamanifest;
+	plist_t tss;
+	plist_t basebandBuildIdentity;
+	char* tss_url;
+	plist_t version_data;
+	uint64_t ecid;
+	unsigned char* nonce;
+	int nonce_size;
+	int image4supported;
+	plist_t preflight_info;
 	char* udid;
 	char* srnm;
 	char* ipsw;
@@ -111,7 +104,9 @@ struct idevicerestore_client_t {
 	char* cache_dir;
 	idevicerestore_progress_cb_t progress_cb;
 	void* progress_cb_data;
-    void (*recovery_custom_component_function)(struct idevicerestore_client_t*, plist_t, const char*, unsigned char**, unsigned int *);
+    char *manifestPath;
+    char *basebandPath;
+    int isCustom;
 };
 
 extern struct idevicerestore_mode_t idevicerestore_modes[];
@@ -131,7 +126,6 @@ char *generate_guid(void);
 
 #ifdef WIN32
 #include <windows.h>
-#include <unistd.h>
 #define __mkdir(path, mode) mkdir(path)
 #define FMT_qu "%I64u"
 #ifndef sleep
@@ -151,14 +145,8 @@ void idevicerestore_progress(struct idevicerestore_client_t* client, int step, d
 char* strsep(char** strp, const char* delim);
 #endif
 
-#ifndef HAVE_REALPATH
-char* realpath(const char *filename, char *resolved_name);
-#endif
-
-void get_user_input(char *buf, int maxlen, int secure);
-
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* idevicerestore_common_h */
+#endif

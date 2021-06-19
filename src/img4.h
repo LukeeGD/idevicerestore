@@ -32,4 +32,4 @@ int img4_stitch_component(const char* component_name, const unsigned char* compo
 }
 #endif
 
-#endif /* idevicerestore_img4_h */
+#endif

@@ -50,7 +50,6 @@ int recovery_send_applelogo(struct idevicerestore_client_t* client, plist_t buil
 int recovery_send_devicetree(struct idevicerestore_client_t* client, plist_t build_identity);
 int recovery_send_ramdisk(struct idevicerestore_client_t* client, plist_t build_identity);
 int recovery_send_kernelcache(struct idevicerestore_client_t* client, plist_t build_identity);
-int recovery_send_loaded_by_iboot(struct idevicerestore_client_t* client, plist_t build_identity);
 int recovery_send_reset(struct idevicerestore_client_t* client);
 int recovery_send_ticket(struct idevicerestore_client_t* client);
 int recovery_set_autoboot(struct idevicerestore_client_t* client, int enable);
@@ -59,8 +58,9 @@ int recovery_is_image4_supported(struct idevicerestore_client_t* client);
 int recovery_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
 int recovery_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
 
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* idevicerestore_recovery_h */
+#endif

@@ -51,8 +51,9 @@ int asr_perform_validation(asr_client_t asr, const char* filesystem);
 int asr_send_payload(asr_client_t asr, const char* filesystem);
 int asr_handle_oob_data_request(asr_client_t asr, plist_t packet, FILE* file);
 
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* idevicerestore_asr_h */
+#endif

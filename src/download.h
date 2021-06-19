@@ -35,4 +35,4 @@ int download_to_file(const char* url, const char* filename, int enable_progress)
 }
 #endif
 
-#endif /* idevicerestore_download_h */
+#endif

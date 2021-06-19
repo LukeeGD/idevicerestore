@@ -33,7 +33,7 @@
 #include "common.h"
 #include "idevicerestore.h"
 #include "fdr.h"
-#include <endianness.h> /* from libimobiledevice */
+#include "endianness.h" /* from libimobiledevice */
 
 #define CTRL_PORT 0x43a /*1082*/
 #define CTRLCMD  "BeginCtrl"
@@ -143,20 +143,14 @@ int fdr_poll_and_handle_message(fdr_client_t fdr)
 	}
 
 	device_error = idevice_connection_receive_timeout(fdr->connection, (char *)&cmd, sizeof(cmd), &bytes, 20000);
-#ifdef HAVE_IDEVICE_E_TIMEOUT
-	if (device_error == IDEVICE_E_TIMEOUT || (device_error == IDEVICE_E_SUCCESS && bytes != sizeof(cmd)))
-#else
-	if (device_error == IDEVICE_E_SUCCESS && bytes != sizeof(cmd))
-#endif
-	{
-		debug("FDR %p timeout waiting for command\n", fdr);
-		return 0;
-	}
-	else if (device_error != IDEVICE_E_SUCCESS) {
+	if (device_error != IDEVICE_E_SUCCESS) {
 		if (fdr->connection) {
 			error("ERROR: Unable to receive message from FDR %p (%d). %u/%d bytes\n", fdr, device_error, bytes, sizeof(cmd));
 		}
 		return -1;
+	} else if (bytes != sizeof(cmd)) {
+		debug("FDR %p timeout waiting for command\n", fdr);
+		return 0;
 	}
 
 	if (cmd == FDR_SYNC_MSG) {
@@ -181,7 +175,7 @@ int fdr_poll_and_handle_message(fdr_client_t fdr)
 void *fdr_listener_thread(void *cdata)
 {
 	fdr_client_t fdr = cdata;
-	int res;
+	int res = 0;
 
 	while (fdr && fdr->connection) {
 		debug("FDR %p waiting for message...\n", fdr);
@@ -415,7 +409,7 @@ static int fdr_handle_sync_cmd(fdr_client_t fdr_ctrl)
 {
 	idevice_error_t device_error = IDEVICE_E_SUCCESS;
 	fdr_client_t fdr;
-	THREAD_T fdr_thread = (THREAD_T)NULL;
+	thread_t fdr_thread = (thread_t)NULL;
 	int res = 0;
 	uint32_t bytes = 0;
 	char buf[4096];
@@ -546,18 +540,12 @@ static int fdr_handle_proxy_cmd(fdr_client_t fdr)
 	while (1) {
 		bytes = 0;
 		device_error = idevice_connection_receive_timeout(fdr->connection, buf, sizeof(buf), &bytes, 100);
-#ifdef HAVE_IDEVICE_E_TIMEOUT
-		if (device_error == IDEVICE_E_TIMEOUT || (device_error == IDEVICE_E_SUCCESS && !bytes))
-#else
-		if (device_error == IDEVICE_E_SUCCESS && !bytes)
-#endif
-		{
-			//debug("WARNING: Timeout waiting for proxy payload. %p\n", fdr);
-		}
-		else if (device_error != IDEVICE_E_SUCCESS) {
+		if (device_error != IDEVICE_E_SUCCESS) {
 			error("ERROR: FDR %p Unable to receive proxy payload (%d)\n", fdr, device_error);
 			res = -1;
 			break;
+		} else if (!bytes) {
+			//debug("WARNING: Timeout waiting for proxy payload. %p\n", fdr);
 		}
 		if (bytes) {
 			debug("FDR %p got payload of %u bytes, now try to proxy it\n", fdr, bytes);

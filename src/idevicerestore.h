@@ -2,8 +2,8 @@
  * idevicerestore.h
  * Restore device firmware and filesystem
  *
- * Copyright (c) 2012-2019 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010-2012 Martin Szulecki. All Rights Reserved.
+ * Copyright (c) 2012-2015 Nikias Bassen. All Rights Reserved.
  * Copyright (c) 2010 Joshua Hill. All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -31,23 +31,18 @@ extern "C" {
 #include <stdio.h>
 #include <stdint.h>
 #include <plist/plist.h>
-#include <libirecovery.h>
 
 // the flag with value 1 is reserved for internal use only. don't use it.
-#define FLAG_DEBUG           (1 << 1)
-#define FLAG_ERASE           (1 << 2)
-#define FLAG_CUSTOM          (1 << 3)
-#define FLAG_EXCLUDE         (1 << 4)
-#define FLAG_PWN             (1 << 5)
-#define FLAG_NOACTION        (1 << 6)
-#define FLAG_SHSHONLY        (1 << 7)
-#define FLAG_LATEST          (1 << 8)
-#define FLAG_INTERACTIVE     (1 << 9)
-#define FLAG_DOWNGRADE       (1 << 10)
-#define FLAG_OTAMANIFEST     (1 << 11)
-#define FLAG_BOOT            (1 << 12)
-#define FLAG_PANICLOG        (1 << 13)
-#define FLAG_NOBOOTX         (1 << 14)
+#define FLAG_DEBUG           1 << 1
+#define FLAG_ERASE           1 << 2
+#define FLAG_CUSTOM          1 << 3
+#define FLAG_EXCLUDE         1 << 4
+#define FLAG_PWN             1 << 5
+#define FLAG_NOACTION        1 << 6
+#define FLAG_SHSHONLY        1 << 7
+#define FLAG_LATEST          1 << 8
+#define FLAG_RERESTORE       1 << 9
+#define FLAG_UPDATE          1 << 10
 
 struct idevicerestore_client_t;
 
@@ -79,8 +74,9 @@ void idevicerestore_set_debug_stream(FILE* strm);
 int idevicerestore_start(struct idevicerestore_client_t* client);
 const char* idevicerestore_get_error(void);
 
+void usage(int argc, char* argv[]);
 int check_mode(struct idevicerestore_client_t* client);
-irecv_device_t get_irecv_device(struct idevicerestore_client_t* client);
+const char* check_hardware_model(struct idevicerestore_client_t* client);
 int get_ecid(struct idevicerestore_client_t* client, uint64_t* ecid);
 int is_image4_supported(struct idevicerestore_client_t* client);
 int get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
@@ -95,7 +91,6 @@ plist_t build_manifest_get_build_identity_for_model(plist_t build_manifest, cons
 plist_t build_manifest_get_build_identity_for_model_with_restore_behavior(plist_t build_manifest, const char *hardware_model, const char *behavior);
 int build_manifest_get_build_count(plist_t build_manifest);
 void build_identity_print_information(plist_t build_identity);
-int build_identity_check_components_in_ipsw(plist_t build_identity, const char* ipsw);
 int build_identity_has_component(plist_t build_identity, const char* component);
 int build_identity_get_component_path(plist_t build_identity, const char* component, char** path);
 int ipsw_extract_filesystem(const char* ipsw, plist_t build_identity, char** filesystem);
@@ -103,9 +98,11 @@ int extract_component(const char* ipsw, const char* path, unsigned char** compon
 int personalize_component(const char *component, const unsigned char* component_data, unsigned int component_size, plist_t tss_response, unsigned char** personalized_component, unsigned int* personalized_component_size);
 
 const char* get_component_name(const char* filename);
+    
 
+    
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* idevicerestore_h */
+#endif
