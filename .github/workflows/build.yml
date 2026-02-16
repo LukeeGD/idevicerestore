@@ -23,29 +23,13 @@ jobs:
         run: zip -r libimobiledevice_linux-${{ matrix.arch.name }}.zip bin/
 
       - name: Update latest release
-        uses: pyTooling/Actions/releaser/composite@main
-        with:
-          tag: latest
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: libimobiledevice_linux-${{ matrix.arch.name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload latest \
+            libimobiledevice_linux-${{ matrix.arch.name }}.zip \
+            --clobber -R ${{ github.repository }}
 
-  # win:
-  #   runs-on: windows-latest
-  #   defaults:
-  #     run:
-  #       shell: msys2 {0}
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #
-  #     - uses: msys2/setup-msys2@v2
-  #       with:
-  #         msystem: MINGW64
-  #         update: true
-  #
-  #     - name: Run compile script
-  #       run: ./compile.sh
-  #
-  #     - uses: actions/upload-artifact@v3
-  #       with:
-  #         name: idevicerestore_win
-  #         path: bin/
+          gh release edit latest \
+            --title "Latest" \
+            --target ${{ github.sha }} -R ${{ github.repository }}
