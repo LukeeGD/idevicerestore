@@ -142,6 +142,7 @@ static void usage(int argc, char* argv[], int err)
 	"\n" \
 	"Advanced/experimental options:\n"
 	"  -c, --custom          Restore with a custom firmware (requires bootrom exploit)\n" \
+	"  -w, --downgrade       Downgrade with a custom firmware\n" \
 	"  -s, --server URL      Override default signing server request URL\n" \
 	"  -x, --exclude         Exclude nor/baseband upgrade (legacy devices)\n" \
 	"  -t, --shsh            Fetch TSS record and save to .shsh file, then exit\n" \
@@ -1815,7 +1816,7 @@ int main(int argc, char* argv[])
 #define P_FLAG ""
 #endif
 
-	while ((opt = getopt_long(argc, argv, "dhces:xtli:u:nC:kyPRT:zv" P_FLAG, longopts, &optindex)) > 0) {
+	while ((opt = getopt_long(argc, argv, "dhcwes:xtli:u:nC:kyPRT:zv" P_FLAG, longopts, &optindex)) > 0) {
 		switch (opt) {
 		case 'h':
 			usage(argc, argv, 0);
@@ -1835,6 +1836,10 @@ int main(int argc, char* argv[])
 
 		case 'c':
 			client->flags |= FLAG_CUSTOM;
+			break;
+
+		case 'w':
+			client->flags |= FLAG_DOWNGRADE;;
 			break;
 
 		case 's': {
@@ -2313,7 +2318,7 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 	plist_t response = NULL;
 	*tss = NULL;
 
-	if ((client->build_major <= 8) || (client->flags & FLAG_CUSTOM)) {
+	if ((client->build_major <= 8) || (client->flags & (FLAG_CUSTOM | FLAG_DOWNGRADE))) {
 		logger(LL_ERROR, "checking for local shsh\n");
 
 		/* first check for local copy */
@@ -2371,6 +2376,9 @@ int get_tss_response(struct idevicerestore_client_t* client, plist_t build_ident
 	if (*tss) {
 		logger(LL_INFO, "Using cached SHSH\n");
 		return 0;
+	} else if (client->flags & FLAG_DOWNGRADE) {
+		logger(LL_ERROR, "Refusing to proceed without saved ticket\n");
+		return -1;
 	} else {
 		logger(LL_INFO, "Trying to fetch new SHSH blob\n");
 	}
