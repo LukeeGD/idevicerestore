@@ -1655,7 +1655,9 @@ int restore_send_nor(struct idevicerestore_client_t* client, plist_t message)
 	snprintf(manifest_file, sizeof(manifest_file), "%s/manifest", firmware_path);
 
 	firmware_files = plist_new_array();
-	ipsw_extract_to_memory(client->ipsw, manifest_file, &manifest_data, &manifest_size);
+	if (ipsw_file_exists(client->ipsw, manifest_file)) {
+		ipsw_extract_to_memory(client->ipsw, manifest_file, &manifest_data, &manifest_size);
+	}
 	if (manifest_data && manifest_size > 0) {
 		logger(LL_INFO, "Getting firmware manifest from %s\n", manifest_file);
 		char *manifest_p = (char*)manifest_data;
