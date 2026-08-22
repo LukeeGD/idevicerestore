@@ -163,8 +163,9 @@ if [[ $OSTYPE == "linux"* ]]; then
         cd $FR_BASE
         echo "Downloading more deps and utils"
         git clone --filter=blob:none https://github.com/GNOME/libxml2
-        git clone --filter=blob:none https://github.com/LukeeGD/libideviceactivation
-        git clone --filter=blob:none https://github.com/LukeeGD/ideviceinstaller
+        git clone --filter=blob:none https://github.com/libimobiledevice/libideviceactivation
+        git clone --filter=blob:none https://github.com/libimobiledevice/ideviceinstaller
+        git clone --filter=blob:none https://github.com/libimobiledevice/usbmuxd
 
         echo "Building libxml2..."
         cd $FR_BASE
@@ -190,10 +191,18 @@ if [[ $OSTYPE == "linux"* ]]; then
         make $JNUM
         make $JNUM install
 
+        echo "Building usbmuxd..."
+        cd $FR_BASE
+        cd usbmuxd
+        ./autogen.sh $CONF_ARGS $CC_ARGS --without-preflight --without-systemd
+        make $JNUM
+        make $JNUM install
+
         cd $FR_BASE
         cd ..
         mkdir -p bin/lib
-        cp /usr/local/bin/i* bin/
+        cp /usr/local/bin/afcclient /usr/local/bin/i* /usr/local/sbin/usbmuxd bin/
+        rm -f bin/irb
         cp /usr/local/lib/libcrypto.so.35 /usr/local/lib/libssl.so.35 bin/lib/ # comment line for ssl3
     fi
 
