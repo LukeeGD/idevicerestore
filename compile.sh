@@ -109,7 +109,7 @@ if [[ $OSTYPE == "linux"* ]]; then
     echo "Building curl..."
     cd $FR_BASE
     cd curl
-    git checkout curl-8_12_1
+    git checkout curl-7_65_3
     autoreconf -fi
     ./configure --disable-werror --disable-shared --with-openssl --without-libpsl
     make $JNUM
