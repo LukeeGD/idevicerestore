@@ -72,12 +72,12 @@ if [[ $OSTYPE == "linux"* ]]; then
     git clone --filter=blob:none https://github.com/libimobiledevice/libirecovery
     # git clone --filter=blob:none https://github.com/libimobiledevice/idevicerestore # uncomment line for latest idr
     git clone --filter=blob:none https://github.com/nih-at/libzip
+    git clone --filter=blob:none https://github.com/curl/curl
     aria2c="aria2c -c -s 16 -x 16 -k 1M -j 1"
     $aria2c https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
-    $aria2c https://github.com/facebook/zstd/releases/download/v1.5.2/zstd-1.5.2.tar.gz
 
     # comment section for ssl3
-    sslver="2.2.7"
+    sslver="2.2.9"
     $aria2c https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-$sslver.tar.gz
     echo "Building libressl..."
     tar -zxvf libressl-$sslver.tar.gz
@@ -106,13 +106,12 @@ if [[ $OSTYPE == "linux"* ]]; then
     make $JNUM
     make $JNUM install
 
-    curlver="7_54_0"
-    $aria2c https://github.com/curl/curl/archive/refs/tags/curl-$curlver.zip
     echo "Building curl..."
-    unzip curl-curl-$curlver.zip -d .
-    cd curl-curl-$curlver
+    cd $FR_BASE
+    cd curl
+    git checkout curl-8_12_1
     autoreconf -fi
-    ./configure --disable-werror --disable-shared
+    ./configure --disable-werror --disable-shared --with-openssl --without-libpsl
     make $JNUM
     make $JNUM install
 
@@ -170,7 +169,7 @@ if [[ $OSTYPE == "linux"* ]]; then
         echo "Building libxml2..."
         cd $FR_BASE
         cd libxml2
-        git checkout v2.11.0
+        # git checkout v2.11.0
         mkdir build
         cd build
         cmake .. -D BUILD_SHARED_LIBS=OFF -D LIBXML2_WITH_LZMA=OFF -D LIBXML2_WITH_ZLIB=OFF
