@@ -77,7 +77,7 @@ if [[ $OSTYPE == "linux"* ]]; then
     $aria2c https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
 
     # comment section for ssl3
-    sslver="2.2.9"
+    sslver="4.3.2"
     $aria2c https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-$sslver.tar.gz
     echo "Building libressl..."
     tar -zxvf libressl-$sslver.tar.gz
@@ -109,7 +109,7 @@ if [[ $OSTYPE == "linux"* ]]; then
     echo "Building curl..."
     cd $FR_BASE
     cd curl
-    git checkout curl-7_65_3
+    # git checkout curl-7_65_3 # comment line for ssl3
     autoreconf -fi
     ./configure --disable-werror --disable-shared --with-openssl --without-libpsl
     make $JNUM
@@ -169,7 +169,7 @@ if [[ $OSTYPE == "linux"* ]]; then
         echo "Building libxml2..."
         cd $FR_BASE
         cd libxml2
-        # git checkout v2.11.0
+        # git checkout v2.11.0 # max version for ubuntu 20.04 (cmake version)
         mkdir build
         cd build
         cmake .. -D BUILD_SHARED_LIBS=OFF -D LIBXML2_WITH_LZMA=OFF -D LIBXML2_WITH_ZLIB=OFF
@@ -199,10 +199,10 @@ if [[ $OSTYPE == "linux"* ]]; then
 
         cd $FR_BASE
         cd ..
-        mkdir -p bin/lib
         cp /usr/local/bin/afcclient /usr/local/bin/i* /usr/local/sbin/usbmuxd bin/
         rm -f bin/irb
-        cp /usr/local/lib/libcrypto.so.35 /usr/local/lib/libssl.so.35 bin/lib/ # comment line for ssl3
+        mkdir -p bin/lib # comment line for ssl3
+        cp /usr/local/lib/libcrypto.so.* /usr/local/lib/libssl.so.* bin/lib/ # comment line for ssl3
     fi
 
     echo "Building idevicerestore!"
