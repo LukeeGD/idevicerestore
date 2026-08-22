@@ -899,6 +899,14 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			strcpy(tmpstr, p_all_flash);
 			strcat(tmpstr, "/manifest");
 
+			if (!ipsw_file_exists(client->ipsw, tmpstr) && strcmp(tmpstr, "Firmware/all_flash/all_flash.m68ap.production/manifest") == 0) {
+				logger(LL_INFO, "Cannot find m68ap manifest, trying n45ap\n");
+				sprintf(lcmodel, "n45ap");
+				sprintf(p_all_flash, "Firmware/all_flash/all_flash.%s.%s", lcmodel, "production");
+				strcpy(tmpstr, p_all_flash);
+				strcat(tmpstr, "/manifest");
+			}
+
 			// get all_flash file manifest
 			char *files[16];
 			void *fmanifest = NULL;
@@ -2884,9 +2892,23 @@ int build_manifest_check_compatibility(plist_t build_manifest, const char* produ
 	plist_t node = plist_dict_get_item(build_manifest, "SupportedProductTypes");
 	if (!node || (plist_get_node_type(node) != PLIST_ARRAY)) {
 		logger(LL_DEBUG, "%s: ERROR: SupportedProductTypes key missing\n", __func__);
-		logger(LL_DEBUG, "%s: WARNING: If attempting to install iPhoneOS 2.x, be advised that Restore.plist does not contain the\n", __func__);
-		logger(LL_DEBUG, "%s: WARNING: key 'SupportedProductTypes'. Recommendation is to manually add it to the Restore.plist.\n", __func__);
-		return -1;
+		node = plist_dict_get_item(build_manifest, "ProductType");
+		if (plist_get_node_type(node) == PLIST_STRING) {
+			char *val = NULL;
+			plist_get_string_val(node, &val);
+			if (val && (strcmp(val, product) == 0)) {
+				res = 0;
+				free(val);
+			}
+			const char *product2 = "iPod1,1";
+			if (val && (strcmp(val, product2) == 0)) {
+				res = 0;
+				free(val);
+			}
+		} else {
+			logger(LL_DEBUG, "%s: ERROR: ProductType key missing\n", __func__);
+		}
+		return res;
 	}
 	uint32_t pc = plist_array_get_size(node);
 	uint32_t i;
