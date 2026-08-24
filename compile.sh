@@ -72,12 +72,12 @@ if [[ $OSTYPE == "linux"* ]]; then
     git clone --filter=blob:none https://github.com/libimobiledevice/libirecovery
     # git clone --filter=blob:none https://github.com/libimobiledevice/idevicerestore # uncomment line for latest idr
     git clone --filter=blob:none https://github.com/nih-at/libzip
+    git clone --filter=blob:none https://github.com/curl/curl
     aria2c="aria2c -c -s 16 -x 16 -k 1M -j 1"
     $aria2c https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
-    $aria2c https://github.com/facebook/zstd/releases/download/v1.5.2/zstd-1.5.2.tar.gz
 
     # comment section for ssl3
-    sslver="2.2.7"
+    sslver="4.3.2" # or 2.2.9 for old ssl
     $aria2c https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-$sslver.tar.gz
     echo "Building libressl..."
     tar -zxvf libressl-$sslver.tar.gz
@@ -106,13 +106,12 @@ if [[ $OSTYPE == "linux"* ]]; then
     make $JNUM
     make $JNUM install
 
-    curlver="7_54_0"
-    $aria2c https://github.com/curl/curl/archive/refs/tags/curl-$curlver.zip
     echo "Building curl..."
-    unzip curl-curl-$curlver.zip -d .
-    cd curl-curl-$curlver
+    cd $FR_BASE
+    cd curl
+    git checkout curl-8_21_0 # or curl-7_65_3 for old ssl
     autoreconf -fi
-    ./configure --disable-werror --disable-shared
+    ./configure --disable-werror --disable-shared --with-openssl --without-libpsl
     make $JNUM
     make $JNUM install
 
@@ -147,6 +146,7 @@ if [[ $OSTYPE == "linux"* ]]; then
     echo "Building libzip..."
     cd $FR_BASE
     cd libzip
+    git checkout v1.11.4
     sed -i 's/\"Build shared libraries\" ON/\"Build shared libraries\" OFF/g' CMakeLists.txt
     cmake $CC_ARGS .
     make $JNUM
@@ -163,13 +163,14 @@ if [[ $OSTYPE == "linux"* ]]; then
         cd $FR_BASE
         echo "Downloading more deps and utils"
         git clone --filter=blob:none https://github.com/GNOME/libxml2
-        git clone --filter=blob:none https://github.com/LukeeGD/libideviceactivation
-        git clone --filter=blob:none https://github.com/LukeeGD/ideviceinstaller
+        git clone --filter=blob:none https://github.com/libimobiledevice/libideviceactivation
+        git clone --filter=blob:none https://github.com/libimobiledevice/ideviceinstaller
+        git clone --filter=blob:none https://github.com/libimobiledevice/usbmuxd
 
         echo "Building libxml2..."
         cd $FR_BASE
         cd libxml2
-        git checkout v2.11.0
+        # git checkout v2.11.0 # max version for ubuntu 20.04 (cmake version)
         mkdir build
         cd build
         cmake .. -D BUILD_SHARED_LIBS=OFF -D LIBXML2_WITH_LZMA=OFF -D LIBXML2_WITH_ZLIB=OFF
@@ -190,11 +191,19 @@ if [[ $OSTYPE == "linux"* ]]; then
         make $JNUM
         make $JNUM install
 
+        echo "Building usbmuxd..."
+        cd $FR_BASE
+        cd usbmuxd
+        ./autogen.sh $CONF_ARGS $CC_ARGS --without-preflight --without-systemd
+        make $JNUM
+        make $JNUM install
+
         cd $FR_BASE
         cd ..
-        mkdir -p bin/lib
-        cp /usr/local/bin/i* bin/
-        cp /usr/local/lib/libcrypto.so.35 /usr/local/lib/libssl.so.35 bin/lib/ # comment line for ssl3
+        cp /usr/local/bin/afcclient /usr/local/bin/i* /usr/local/bin/plistutil /usr/local/sbin/usbmuxd bin/
+        rm -f bin/irb
+        mkdir -p bin/lib # comment line for ssl3
+        cp /usr/local/lib/libcrypto.so.57 /usr/local/lib/libssl.so.60 bin/lib/ # comment line for ssl3 or change to so.35 for old ssl
     fi
 
     echo "Building idevicerestore!"
