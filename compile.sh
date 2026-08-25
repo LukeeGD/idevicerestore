@@ -66,7 +66,7 @@ if [[ $OSTYPE == "linux"* ]]; then
     git clone --filter=blob:none https://github.com/lzfse/lzfse
     git clone --filter=blob:none https://github.com/libimobiledevice/libplist
     git clone --filter=blob:none https://github.com/libimobiledevice/libimobiledevice-glue
-    git clone --filter=blob:none https://github.com/libimobiledevice/libtatsu
+    git clone --filter=blob:none https://github.com/LukeeGD/libtatsu
     git clone --filter=blob:none https://github.com/libimobiledevice/libusbmuxd
     git clone --filter=blob:none https://github.com/libimobiledevice/libimobiledevice
     git clone --filter=blob:none https://github.com/libimobiledevice/libirecovery

@@ -1,5 +1,8 @@
 name: Compile idevicerestore
-on: [push]
+on:
+  push:
+    branches:
+      - master
 jobs:
   linux-limd:
     strategy:
