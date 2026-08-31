@@ -270,7 +270,7 @@ static void idevice_event_cb(const idevice_event_t *event, void *userdata)
 			logger(LL_DEBUG, "%s: device %016" PRIx64 " (udid: %s) connected in normal mode\n", __func__, client->ecid, client->udid);
 			cond_signal(&client->device_event_cond);
 			mutex_unlock(&client->device_event_mutex);
-		} else if (client->ecid && restore_check_mode(client) == 0) {
+		} else if ((client->ecid || (client->device && client->device->chip_id == 0x8900)) && restore_check_mode(client) == 0) {
 			mutex_lock(&client->device_event_mutex);
 			client->mode = MODE_RESTORE;
 			logger(LL_DEBUG, "%s: device %016" PRIx64 " (udid: %s) connected in restore mode\n", __func__, client->ecid, client->udid);
@@ -299,7 +299,7 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 		if (!client->udid && !client->ecid) {
 			client->ecid = event->device_info->ecid;
 		}
-		if (client->ecid && event->device_info->ecid == client->ecid) {
+		if ((client->ecid || event->device_info->cpid == 0x8900) && event->device_info->ecid == client->ecid) {
 			mutex_lock(&client->device_event_mutex);
 			switch (event->mode) {
 				case IRECV_K_WTF_MODE:
@@ -328,7 +328,7 @@ static void irecv_event_cb(const irecv_device_event_t* event, void *userdata)
 			mutex_unlock(&client->device_event_mutex);
 		}
 	} else if (event->type == IRECV_DEVICE_REMOVE) {
-		if (client->ecid && event->device_info->ecid == client->ecid) {
+		if ((client->ecid || event->device_info->cpid == 0x8900) && event->device_info->ecid == client->ecid) {
 			mutex_lock(&client->device_event_mutex);
 			client->mode = MODE_UNKNOWN;
 			logger(LL_DEBUG, "%s: device %016" PRIx64 " (udid: %s) disconnected\n", __func__, client->ecid, (client->udid) ? client->udid : "N/A");
@@ -480,10 +480,9 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		free(wtftmp);
 
 		cond_wait_timeout(&client->device_event_cond, &client->device_event_mutex, 10000);
-		if (client->mode != MODE_DFU || (client->flags & FLAG_QUIT)) {
+		if (client->mode != MODE_DFU && client->mode != MODE_WTF) {
 			mutex_unlock(&client->device_event_mutex);
-			/* TODO: verify if it actually goes from 0x1222 -> 0x1227 */
-			logger(LL_ERROR, "Failed to put device into DFU from WTF mode\n");
+			logger(LL_ERROR, "Device did not reconnect in DFU/WTF mode.\n");
 			return -1;
 		}
 		mutex_unlock(&client->device_event_mutex);
@@ -495,7 +494,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		logger(LL_ERROR, "Unable to discover device type\n");
 		return -1;
 	}
-	if (client->ecid == 0) {
+	if (client->ecid == 0 && client->mode != MODE_WTF) {
 		logger(LL_ERROR, "Unable to determine ECID\n");
 		return -1;
 	}
@@ -664,17 +663,23 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 	}
 
 	// extract buildmanifest
+	int isRestorePlist = 0;
 	if (client->flags & FLAG_CUSTOM) {
 		logger(LL_INFO, "Extracting Restore.plist from IPSW\n");
 		if (ipsw_extract_restore_plist(client->ipsw, &client->build_manifest) < 0) {
 			logger(LL_ERROR, "Unable to extract Restore.plist from %s. Firmware file might be corrupt.\n", client->ipsw->path);
 			return -1;
 		}
+		isRestorePlist = 1;
 	} else {
 		logger(LL_INFO, "Extracting BuildManifest from IPSW\n");
 		if (ipsw_extract_build_manifest(client->ipsw, &client->build_manifest, &tss_enabled) < 0) {
 			logger(LL_ERROR, "Unable to extract BuildManifest from %s. Firmware file might be corrupt.\n", client->ipsw->path);
-			return -1;
+			if (ipsw_extract_restore_plist(client->ipsw, &client->build_manifest) < 0) {
+				error("ERROR: Unable to extract Restore.plist from %s. Firmware file might be corrupt.\n", client->ipsw->path);
+				return -1;
+			}
+			isRestorePlist = 1;
 		}
 	}
 
@@ -857,28 +862,39 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 
 	idevicerestore_progress(client, RESTORE_STEP_DETECT, 0.8);
 
-	/* check if device type is supported by the given build manifest */
-	if (build_manifest_check_compatibility(client->build_manifest, client->device->product_type) < 0) {
-		logger(LL_ERROR, "Could not make sure this firmware is suitable for the current device. Refusing to continue.\n");
-		return -1;
-	}
-
-	/* print iOS information from the manifest */
-	build_manifest_get_version_information(client->build_manifest, client);
-
-	logger(LL_INFO, "IPSW Product Version: %s\n", client->version);
-	logger(LL_INFO, "IPSW Product Build: %s Major: %d\n", client->build, client->build_major);
-
-	client->image4supported = is_image4_supported(client);
-	logger(LL_INFO, "Device supports Image4: %s\n", (client->image4supported) ? "true" : "false");
-
 	// choose whether this is an upgrade or a restore (default to upgrade)
 	client->tss = NULL;
 	plist_t build_identity = NULL;
 	int build_identity_needs_free = 0;
-	if (client->flags & FLAG_CUSTOM) {
+	if (isRestorePlist) {
 		build_identity = plist_new_dict();
 		build_identity_needs_free = 1;
+
+		if (client->mode == MODE_WTF) {
+			/*
+			 *	If we're still in WTF mode (i.e. when restoring iOS 1) we can't correctly identify the device yet.
+			 *	We'll just assume that this firmware is correct for the device and identify the device base on the firmware.
+			 *	Not ideal, but there is no other way to distinguish iPod1,1 from iPhone1,1 restoring iOS 1
+			 */
+			plist_t p_ProductType = plist_dict_get_item(client->build_manifest, "ProductType");
+			if (!p_ProductType){
+				error("ERROR: Unable to get ProductType from Restore.plist\n");
+			}else{
+				char *firmwareProductType = NULL;
+				plist_get_string_val(p_ProductType, &firmwareProductType);
+				if (!firmwareProductType){
+					error("ERROR: ProductType from Restore.plist is not of type PLIST_STRING\n");
+				}else{
+					irecv_error_t ierr = 0;
+					ierr = irecv_devices_get_device_by_product_type(firmwareProductType, &client->device);
+					if (ierr){
+						error("ERROR: Failed to identify device from ProductType\n");
+					}
+					free(firmwareProductType);
+				}
+			}
+		}
+
 		{
 			plist_t node;
 			plist_t comp;
@@ -1037,14 +1053,33 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 			// finally add manifest
 			plist_dict_set_item(build_identity, "Manifest", manifest);
 		}
-	} else if (client->restore_variant) {
-		build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, client->restore_variant, 1);
-	} else if (client->flags & FLAG_ERASE) {
-		build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, RESTORE_VARIANT_ERASE_INSTALL, 0);
-	} else {
-		build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, RESTORE_VARIANT_UPGRADE_INSTALL, 0);
-		if (!build_identity) {
-			build_identity = build_manifest_get_build_identity_for_model(client->build_manifest, client->device->hardware_model);
+	}
+
+	/* check if device type is supported by the given build manifest */
+	if (build_manifest_check_compatibility(client->build_manifest, client->device->product_type) < 0) {
+		logger(LL_ERROR, "Could not make sure this firmware is suitable for the current device. Refusing to continue.\n");
+		return -1;
+	}
+
+	/* print iOS information from the manifest */
+	build_manifest_get_version_information(client->build_manifest, client);
+
+	logger(LL_INFO, "IPSW Product Version: %s\n", client->version);
+	logger(LL_INFO, "IPSW Product Build: %s Major: %d\n", client->build, client->build_major);
+
+	client->image4supported = is_image4_supported(client);
+	logger(LL_INFO, "Device supports Image4: %s\n", (client->image4supported) ? "true" : "false");
+
+	if (!build_identity) {
+		if (client->restore_variant) {
+			build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, client->restore_variant, 1);
+		} else if (client->flags & FLAG_ERASE) {
+			build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, RESTORE_VARIANT_ERASE_INSTALL, 0);
+		} else {
+			build_identity = build_manifest_get_build_identity_for_model_with_variant(client->build_manifest, client->device->hardware_model, RESTORE_VARIANT_UPGRADE_INSTALL, 0);
+			if (!build_identity) {
+				build_identity = build_manifest_get_build_identity_for_model(client->build_manifest, client->device->hardware_model);
+			}
 		}
 	}
 	if (build_identity == NULL) {
@@ -1403,7 +1438,7 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		return -1;
 	}
 
-	if (client->mode == MODE_DFU) {
+	if (client->mode == MODE_DFU || client->mode == MODE_WTF) {
 		// if the device is in DFU mode, place it into recovery mode
 		dfu_client_free(client);
 		recovery_client_free(client);
@@ -2076,6 +2111,7 @@ irecv_device_t get_irecv_device(struct idevicerestore_client_t *client)
 	case _MODE_NORMAL:
 		return normal_get_irecv_device(client);
 
+	case _MODE_WTF:
 	case _MODE_DFU:
 	case _MODE_PORTDFU:
 	case _MODE_RECOVERY:
@@ -3093,6 +3129,7 @@ const char* get_component_name(const char* filename)
 		{ "batterylow1", 11, "BatteryLow1" },
 		{ "glyphcharging", 13, "BatteryCharging" },
 		{ "glyphplugin", 11, "BatteryPlugin" },
+		{ "batterycharging", 15, "BatteryCharging" },
 		{ "batterycharging0", 16, "BatteryCharging0" },
 		{ "batterycharging1", 16, "BatteryCharging1" },
 		{ "batteryfull", 11, "BatteryFull" },
